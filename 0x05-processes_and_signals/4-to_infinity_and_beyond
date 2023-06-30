@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-#Bash script that displays To infinity and beyond indefinitely.
-#In between each iteration of the loop, add a sleep 2
-while true
-do
-  echo "To infinity and beyond"
-  sleep 2
+# prints 'To infinity and beyond' in infinite loop with 2 sec delay
+while ((1)); do
+    echo 'To infinity and beyond'
+    sleep 2
 done
