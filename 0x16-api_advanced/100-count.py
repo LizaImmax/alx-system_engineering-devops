@@ -1,55 +1,49 @@
 #!/usr/bin/python3
-"""Function to count words in all hot posts of a given Reddit subreddit."""
-import requests
+""" 0x16. API advanced, task 3. Count it!
+"""
+from re import findall, IGNORECASE
+from requests import get
 
 
-def count_words(subreddit, word_list, instances={}, after="", count=0):
-    """Prints counts of given words found in hot posts of a given subreddit.
+def count_words(subreddit, word_list, word_totals={}, after=''):
+   
+    limit = 100
+    # (adding request parameter raw_json deactivates default ampersand escape)
+    url = 'https://www.reddit.com/r/{}/hot.json?raw_json=1&after={}&limit={}'
+    response = get(url.format(subreddit, after, limit),
+                   headers={'User-Agent': 'allelomorph-app2'})
 
-    Args:
-        subreddit (str): The subreddit to search.
-        word_list (list): The list of words to search for in post titles.
-        instances (obj): Key/value pairs of words/counts.
-        after (str): The parameter for the next page of the API results.
-        count (int): The parameter of results matched thus far.
-    """
-    url = "https://www.reddit.com/r/{}/hot/.json".format(subreddit)
-    headers = {
-        "User-Agent": "linux:0x16.api.advanced:v1.0.0 (by /u/bdov_)"
-    }
-    params = {
-        "after": after,
-        "count": count,
-        "limit": 100
-    }
-    response = requests.get(url, headers=headers, params=params,
-                            allow_redirects=False)
-    try:
-        results = response.json()
-        if response.status_code == 404:
-            raise Exception
-    except Exception:
-        print("")
+    # 404 or other error, or no search terms
+    if response.status_code != 200 or len(word_list) == 0:
         return
 
-    results = results.get("data")
-    after = results.get("after")
-    count += results.get("dist")
-    for c in results.get("children"):
-        title = c.get("data").get("title").lower().split()
-        for word in word_list:
-            if word.lower() in title:
-                times = len([t for t in title if t == word.lower()])
-                if instances.get(word) is None:
-                    instances[word] = times
-                else:
-                    instances[word] += times
+    regex = '^{}$|^{} +| +{} +| +{}$'
+    word_count = dict.fromkeys([word.lower() for word in word_list], 0)
+    current_page_list = response.json().get('data').get('children', [])
 
-    if after is None:
-        if len(instances) == 0:
-            print("")
-            return
-        instances = sorted(instances.items(), key=lambda kv: (-kv[1], kv[0]))
-        [print("{}: {}".format(k, v)) for k, v in instances]
-    else:
-        count_words(subreddit, word_list, instances, after, count)
+    # search titles in current page for terms
+    for post in current_page_list:
+        title = post.get('data').get('title', '')
+        for word in word_list:
+            count = len(findall(regex.format(word, word, word, word),
+                                title, IGNORECASE))
+            word_count[word.lower()] += count
+
+    # update totals
+    for key, value in word_count.items():
+        if key in word_totals:
+            word_totals[key] += value
+        else:
+            word_totals[key] = value
+
+    # last page reached, print totals
+    if len(current_page_list) < limit:
+        for item in sorted(word_totals.items(),
+                           key=lambda item: (-item[1], item[0])):
+            if item[1] > 0:
+                print('{}: {}'.format(item[0], item[1]))
+        return
+
+    # still more titles to parse, recurse to next frame
+    after = current_page_list[-1].get('data').get('name', '')
+    return count_words(subreddit, word_list, word_totals, after)
