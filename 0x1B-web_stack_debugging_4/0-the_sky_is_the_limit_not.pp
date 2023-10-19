@@ -1,13 +1,12 @@
-# Increases the amount of traffic an Nginx server can handle.
+# 0. Sky is the limit...: raise simultaneous open file descriptor cap on nginx
 
-# Increase the ULIMIT of the default file
-exec { 'fix--for-nginx':
-  command => 'sed -i "s/15/4096/" /etc/default/nginx',
-  path    => '/usr/local/bin/:/bin/'
-} ->
-
-# Restart Nginx
-exec { 'nginx-restart':
-  command => 'nginx restart',
-  path    => '/etc/init.d/'
+file { '/etc/default/nginx' :
+  ensure  => file,
+}
+-> exec { 'comment out arbitrary FD limit':
+  path    => '/usr/bin:/usr/sbin:/bin',
+  command => 'sed -i "s/^ULIMIT=/# ULIMIT=/" /etc/default/nginx',
+}
+~> service { 'nginx' :
+  ensure  => running;
 }
